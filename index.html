@@ -1,0 +1,2412 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TAIBAHN — Zugzielanzeiger</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;500;700&family=IBM+Plex+Sans:wght@300;400;500;700&family=DotGothic16&family=Press+Start+2P&display=swap');
+
+  :root {
+    /* True DB blue-on-blue LCD palette */
+    --bg: #1a2e5a;
+    --blue: #003a96;
+    --blue-mid: #0050cc;
+    --blue-bright: #1a6fd4;
+    --blue-light: #6ab0ff;
+    --blue-panel: #002580;
+    --blue-row:   #002070;
+    --blue-alt:   #001d65;
+    --blue-hover: #00299e;
+    --blue-deep:  #001550;
+    --white: #ffffff;
+    --off-white: #ddeeff;
+    --yellow: #ffd700;
+    --orange: #ffaa00;
+    --red: #ff4444;
+    --green: #44ee88;
+    --gray: #7a9abf;
+    --gray-light: #aac8e8;
+    --panel-bg: var(--blue-panel);
+    --row-alt: var(--blue-alt);
+    --row-hover: var(--blue-hover);
+    --border: #1a4a9a;
+    --scan-line: rgba(0,20,80,0.12);
+    --pixel-font: 'DotGothic16', 'Press Start 2P', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--white);
+    font-family: 'IBM Plex Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 3px,
+      var(--scan-line) 3px,
+      var(--scan-line) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ===== HEADER ===== */
+  .header {
+    background: linear-gradient(135deg, #002580 0%, #003ab0 50%, #002580 100%);
+    border-bottom: 3px solid #6ab0ff;
+    padding: 0 24px;
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 4px 24px rgba(0,30,120,0.5);
+    min-height: 64px;
+  }
+
+  /* ===== VERTICAL たい LOGO ===== */
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+
+  .tai-vertical {
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    font-family: 'DotGothic16', monospace;
+    font-size: 13px;
+    color: #aaccff;
+    letter-spacing: 4px;
+    padding: 10px 8px 10px 0;
+    border-right: 1px solid rgba(100,160,255,0.3);
+    margin-right: 12px;
+    line-height: 1;
+    text-shadow: 0 0 8px rgba(100,180,255,0.5);
+  }
+
+  .header-logo {
+    font-family: var(--pixel-font);
+    font-size: 20px;
+    letter-spacing: 3px;
+    color: var(--white);
+    text-shadow: 0 0 16px rgba(100,180,255,0.7), 2px 2px 0 rgba(0,0,80,0.5);
+    display: flex;
+    align-items: center;
+  }
+
+  .header-logo span {
+    color: #6ab0ff;
+  }
+
+  .header-clock {
+    font-family: var(--pixel-font);
+    font-size: 26px;
+    color: var(--yellow);
+    text-shadow: 0 0 12px rgba(255,215,0,0.6), 1px 1px 0 rgba(0,0,80,0.5);
+    letter-spacing: 2px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  /* Analog clock */
+  .analog-clock {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #ffffff, #e8e8e8 80%, #d0d0d0);
+    border: 2px solid #6ab0ff;
+    box-shadow: 0 0 14px rgba(106,176,255,0.35), inset 0 1px 3px rgba(0,0,0,0.15);
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  /* Hour markers */
+  .analog-clock::before {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border-radius: 50%;
+    background:
+      repeating-conic-gradient(
+        #333333 0deg, #333333 1.5deg,
+        transparent 1.5deg, transparent 30deg
+      );
+    opacity: 0.5;
+  }
+
+  /* Centre dot */
+  .analog-clock::after {
+    content: '';
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    background: #cc0000;
+    border-radius: 50%;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 4;
+  }
+
+  .hand {
+    position: absolute;
+    bottom: 50%;
+    left: 50%;
+    transform-origin: bottom center;
+    border-radius: 3px 3px 0 0;
+  }
+
+  .hand-hour {
+    width: 3px;
+    height: 30%;
+    background: #111111;
+    margin-left: -1.5px;
+    z-index: 2;
+  }
+
+  .hand-minute {
+    width: 2px;
+    height: 40%;
+    background: #333333;
+    margin-left: -1px;
+    z-index: 3;
+  }
+
+  .hand-second {
+    width: 1.5px;
+    height: 44%;
+    background: #cc0000;
+    margin-left: -0.75px;
+    z-index: 4;
+  }
+
+  .header-date {
+    font-family: 'DotGothic16', monospace;
+    font-size: 11px;
+    color: var(--gray-light);
+    text-align: right;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+  }
+
+  /* ===== ROTARY KNOB NAV ===== */
+  .nav-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    padding: 20px 24px 0;
+    position: relative;
+    background: #162850;
+  }
+
+  .knob-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .knob {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #3a5a8a, #1a3060 60%, #0a1840);
+    border: 3px solid #2a5090;
+    box-shadow:
+      0 4px 12px rgba(0,0,0,0.5),
+      inset 0 2px 4px rgba(255,255,255,0.15),
+      0 0 0 1px #0a2860;
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    flex-shrink: 0;
+  }
+
+  .knob::after {
+    content: '';
+    position: absolute;
+    top: 7px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 10px;
+    background: var(--blue-light);
+    border-radius: 2px;
+    box-shadow: 0 0 8px var(--blue-light);
+  }
+
+  .knob:hover {
+    box-shadow:
+      0 4px 20px rgba(74,158,255,0.4),
+      inset 0 2px 4px rgba(255,255,255,0.2),
+      0 0 0 1px #2a60c0;
+  }
+
+  .nav-tabs {
+    display: flex;
+    gap: 0;
+    background: #001a60;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .nav-tab {
+    padding: 10px 28px;
+    font-family: 'DotGothic16', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--gray-light);
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    transition: all 0.2s;
+    border-right: 1px solid var(--border);
+    position: relative;
+  }
+
+  .nav-tab:last-child { border-right: none; }
+
+  .nav-tab.active {
+    background: var(--blue-mid);
+    color: var(--white);
+    text-shadow: 0 0 8px rgba(255,255,255,0.4);
+  }
+
+  .nav-tab:hover:not(.active) {
+    background: var(--blue-row);
+    color: var(--white);
+  }
+
+  /* ===== MAIN CONTENT ===== */
+  .main {
+    padding: 20px 24px;
+    max-width: 1100px;
+    margin: 0 auto;
+    background: #162850;
+    min-height: calc(100vh - 140px);
+  }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ===== PANEL HEADER (like DB board title) ===== */
+  .panel-header {
+    background: linear-gradient(90deg, #0035a0, #0050d0, #0035a0);
+    border: 1px solid #3a70d0;
+    padding: 10px 20px;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 0px;
+    border-radius: 2px 2px 0 0;
+  }
+
+  .panel-title {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    color: var(--white);
+    letter-spacing: 2px;
+  }
+
+  .panel-subtitle {
+    font-size: 12px;
+    color: #aaccff;
+    letter-spacing: 2px;
+    font-style: italic;
+  }
+
+  /* ===== DEPARTURE BOARD TABLE ===== */
+  .board {
+    background: var(--blue-panel);
+    border: 1px solid #3a70d0;
+    border-top: none;
+    border-radius: 0 0 2px 2px;
+    overflow: hidden;
+  }
+
+  .board-cols {
+    display: grid;
+    grid-template-columns: 110px 110px 1fr 110px 160px 70px;
+    background: #001a6a;
+    border-bottom: 2px solid #3a70d0;
+    padding: 6px 16px;
+    gap: 12px;
+  }
+
+  .board-col-label {
+    font-family: 'DotGothic16', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #aaccff;
+    text-transform: uppercase;
+  }
+
+  .board-row {
+    display: grid;
+    grid-template-columns: 110px 110px 1fr 110px 160px 70px;
+    padding: 0 16px;
+    gap: 12px;
+    align-items: center;
+    min-height: 52px;
+    border-bottom: 1px solid rgba(58,112,208,0.5);
+    transition: background 0.15s;
+    cursor: default;
+    background: var(--blue-row);
+  }
+
+  .board-row:nth-child(even) { background: var(--blue-alt); }
+  .board-row:hover { background: var(--blue-hover); }
+
+  .board-row.featured {
+    min-height: 104px;
+    border-bottom: 2px solid #3a70d0;
+    background: #003090;
+  }
+
+  .board-row.featured:hover { background: #0035a0; }
+
+  /* Zeit */
+  .zeit-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    justify-content: center;
+  }
+
+  .zeit {
+    font-family: var(--pixel-font);
+    font-size: 20px;
+    color: var(--white);
+    letter-spacing: 1px;
+    line-height: 1;
+  }
+
+  .featured .zeit {
+    font-size: 26px;
+  }
+
+  /* Estimated actual time badge — white bg, blue text, smaller */
+  .zeit-est {
+    display: inline-block;
+    font-family: var(--pixel-font);
+    font-size: 11px;
+    background: #ffffff;
+    color: #0030a0;
+    padding: 1px 5px;
+    border-radius: 2px;
+    letter-spacing: 1px;
+    line-height: 1.4;
+    width: fit-content;
+  }
+
+  .zeit.cancelled { color: #8aaad0; text-decoration: line-through; }
+
+  /* Zug type badge */
+  .zug-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .zug-type {
+    font-family: var(--pixel-font);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 2px 6px;
+    border-radius: 2px;
+  }
+
+  .type-ICE { background: #cc0000; color: white; }
+  .type-IC  { background: #cc0000; color: white; }
+  .type-RE  { background: #1a4a9a; color: white; border: 1px solid #6ab0ff; }
+  .type-RB  { background: #1a4a9a; color: white; border: 1px solid #6ab0ff; }
+  .type-S   { background: #007a42; color: white; }
+  .type-U   { background: #5a1a8a; color: white; }
+  .type-FLX { background: #1fa538; color: white; }
+
+  .zug-num {
+    font-family: var(--pixel-font);
+    font-size: 11px;
+    color: #aaccff;
+  }
+
+  /* Via / Ziel */
+  .via-ziel { }
+
+  .ziel-name {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    color: var(--white);
+    line-height: 1.2;
+  }
+
+  .featured .ziel-name {
+    font-size: 24px;
+  }
+
+  .via-text {
+    font-family: 'DotGothic16', monospace;
+    font-size: 10px;
+    color: #aaccff;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+  }
+
+  /* Status */
+  .status-cell { text-align: right; }
+
+  .status-ok {
+    font-family: 'DotGothic16', monospace;
+    font-size: 11px;
+    color: var(--green);
+    letter-spacing: 1px;
+  }
+
+  .status-delay {
+    font-family: 'DotGothic16', monospace;
+    font-size: 11px;
+    color: var(--orange);
+    letter-spacing: 0.5px;
+    line-height: 1.4;
+  }
+
+  .status-delay .delay-mins {
+    font-family: var(--pixel-font);
+    font-size: 14px;
+    font-weight: 700;
+    display: block;
+  }
+
+  .status-cancelled {
+    font-family: var(--pixel-font);
+    font-size: 9px;
+    color: var(--white);
+    letter-spacing: 1px;
+    font-weight: 700;
+  }
+
+  .status-running {
+    font-family: 'DotGothic16', monospace;
+    font-size: 10px;
+    color: #aaccff;
+    letter-spacing: 1px;
+    font-style: italic;
+  }
+
+  /* Gleis */
+  .gleis-cell { text-align: center; }
+
+  .gleis-label {
+    font-family: 'DotGothic16', monospace;
+    font-size: 9px;
+    color: #8aaad0;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: block;
+  }
+
+  .gleis-num {
+    font-family: var(--pixel-font);
+    font-size: 22px;
+    color: var(--white);
+    line-height: 1;
+  }
+
+  /* Action buttons on board rows */
+  .row-actions {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .btn-action {
+    font-family: 'DotGothic16', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    padding: 3px 8px;
+    border: 1px solid #3a70d0;
+    background: rgba(0,30,100,0.5);
+    color: #aaccff;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn-action:hover { border-color: #6ab0ff; color: var(--white); background: rgba(50,100,200,0.4); }
+  .btn-action.start { border-color: var(--green); color: var(--green); }
+  .btn-action.start:hover { background: rgba(68,238,136,0.15); }
+  .btn-action.finish { border-color: #6ab0ff; color: #6ab0ff; }
+  .btn-action.cancel { border-color: var(--red); color: var(--red); }
+  .btn-action.cancel:hover { background: rgba(255,68,68,0.15); }
+
+  /* Folgezüge section */
+  .folge-header {
+    padding: 8px 16px;
+    font-family: 'DotGothic16', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #aaccff;
+    text-transform: uppercase;
+    background: #001a6a;
+    border-bottom: 1px solid #3a70d0;
+    border-top: 2px solid #3a70d0;
+  }
+
+  /* ===== STATS PAGE ===== */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .stat-card {
+    background: var(--blue-row);
+    border: 1px solid #3a70d0;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: #3a70d0;
+  }
+
+  .stat-card.green::before { background: var(--green); }
+  .stat-card.orange::before { background: var(--orange); }
+  .stat-card.red::before { background: var(--red); }
+
+  .stat-label {
+    font-family: 'DotGothic16', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: #aaccff;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .stat-value {
+    font-family: var(--pixel-font);
+    font-size: 30px;
+    color: var(--white);
+    line-height: 1;
+  }
+
+  .stat-value.green { color: var(--green); text-shadow: 0 0 12px rgba(68,238,136,0.4); }
+  .stat-value.orange { color: var(--orange); text-shadow: 0 0 12px rgba(255,170,0,0.4); }
+  .stat-value.red { color: var(--red); text-shadow: 0 0 12px rgba(255,68,68,0.4); }
+
+  .stat-sub {
+    font-family: 'DotGothic16', monospace;
+    font-size: 10px;
+    color: #aaccff;
+    margin-top: 4px;
+    letter-spacing: 1px;
+  }
+
+  /* Stats table (like Abfahrt board) */
+  .stats-board-cols {
+    display: grid;
+    grid-template-columns: 80px 100px 1fr 50px 90px 90px 100px 100px;
+    background: #001a6a;
+    border-bottom: 2px solid #3a70d0;
+    padding: 6px 16px;
+    gap: 10px;
+  }
+
+  .stats-board-row {
+    display: grid;
+    grid-template-columns: 80px 100px 1fr 50px 90px 90px 100px 100px;
+    padding: 0 16px;
+    gap: 12px;
+    align-items: center;
+    min-height: 48px;
+    border-bottom: 1px solid rgba(58,112,208,0.4);
+    transition: background 0.15s;
+    background: var(--blue-row);
+  }
+
+  .stats-board-row:nth-child(even) { background: var(--blue-alt); }
+  .stats-board-row:hover { background: var(--blue-hover); }
+
+  /* ===== SETTINGS PAGE ===== */
+  .settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .settings-panel {
+    background: var(--blue-panel);
+    border: 1px solid #3a70d0;
+  }
+
+  .settings-panel-header {
+    background: var(--blue-mid);
+    padding: 10px 16px;
+    font-family: 'DotGothic16', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--white);
+  }
+
+  .settings-form {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .form-label {
+    font-family: 'DotGothic16', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    color: #aaccff;
+    text-transform: uppercase;
+  }
+
+  .form-input, .form-select {
+    background: #001a6a;
+    border: 1px solid #3a70d0;
+    color: var(--white);
+    padding: 8px 12px;
+    font-family: 'DotGothic16', monospace;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+    border-radius: 2px;
+    width: 100%;
+  }
+
+  .form-input:focus, .form-select:focus {
+    border-color: #6ab0ff;
+    box-shadow: 0 0 0 2px rgba(106,176,255,0.2);
+  }
+
+  .form-input.invalid { border-color: var(--red); }
+  .form-input.valid { border-color: var(--green); }
+
+  .form-error {
+    font-family: 'DotGothic16', monospace;
+    font-size: 10px;
+    color: var(--red);
+    letter-spacing: 0.5px;
+  }
+
+  .form-hint {
+    font-family: 'DotGothic16', monospace;
+    font-size: 10px;
+    color: #8aaad0;
+    letter-spacing: 0.5px;
+  }
+
+  .form-row-inline {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .btn-submit {
+    margin-top: 8px;
+    background: var(--blue-mid);
+    border: 1px solid #6ab0ff;
+    color: var(--white);
+    padding: 12px;
+    font-family: 'DotGothic16', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 2px;
+  }
+
+  .btn-submit:hover {
+    background: #0060e0;
+    box-shadow: 0 0 15px rgba(106,176,255,0.3);
+  }
+
+  .btn-danger {
+    background: transparent;
+    border: 1px solid var(--red);
+    color: var(--red);
+    padding: 6px 12px;
+    font-family: 'DotGothic16', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+
+  .btn-danger:hover { background: rgba(255,68,68,0.15); }
+
+  /* Train list in settings */
+  .train-list {
+    padding: 0;
+  }
+
+  .train-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid #3a70d0;
+    gap: 12px;
+    background: var(--blue-row);
+  }
+
+  .train-item:nth-child(even) { background: var(--blue-alt); }
+  .train-item:last-child { border-bottom: none; }
+
+  .train-item-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .train-item-name {
+    font-size: 13px;
+    color: var(--white);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .train-item-meta {
+    font-family: 'DotGothic16', monospace;
+    font-size: 10px;
+    color: #aaccff;
+    white-space: nowrap;
+  }
+
+  /* ===== MODAL ===== */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,10,40,0.75);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: #002080;
+    border: 2px solid #6ab0ff;
+    width: 400px;
+    max-width: 95vw;
+    box-shadow: 0 20px 60px rgba(0,30,120,0.7);
+  }
+
+  .modal-header {
+    background: var(--blue-mid);
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .modal-title {
+    font-family: 'DotGothic16', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--white);
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--white);
+    font-size: 18px;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+    font-family: monospace;
+  }
+
+  .modal-close:hover { opacity: 1; }
+
+  .modal-body { padding: 20px; }
+
+  .modal-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .modal-field {
+    background: #001a6a;
+    border: 1px solid #3a70d0;
+    padding: 10px;
+  }
+
+  .modal-field-label {
+    font-family: 'DotGothic16', monospace;
+    font-size: 9px;
+    color: #8aaad0;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .modal-field-value {
+    font-size: 14px;
+    color: var(--white);
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    flex-direction: column;
+  }
+
+  .btn-modal {
+    padding: 10px;
+    font-family: 'DotGothic16', monospace;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+    border: 1px solid;
+    text-align: center;
+    color: var(--white);
+  }
+
+  .btn-modal.green { background: rgba(68,238,136,0.1); border-color: var(--green); color: var(--green); }
+  .btn-modal.green:hover { background: rgba(68,238,136,0.2); }
+  .btn-modal.blue { background: rgba(106,176,255,0.1); border-color: #6ab0ff; color: #6ab0ff; }
+  .btn-modal.blue:hover { background: rgba(106,176,255,0.2); }
+  .btn-modal.red { background: rgba(255,68,68,0.1); border-color: var(--red); color: var(--red); }
+  .btn-modal.red:hover { background: rgba(255,68,68,0.2); }
+
+  /* ===== TOAST ===== */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--blue-mid);
+    border: 1px solid #6ab0ff;
+    padding: 12px 20px;
+    font-family: 'DotGothic16', monospace;
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: var(--white);
+    z-index: 9998;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.3s;
+    border-radius: 2px;
+    box-shadow: 0 8px 24px rgba(0,30,120,0.5);
+  }
+
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.error { background: #5a0010; border-color: var(--red); }
+  .toast.success { background: #004a20; border-color: var(--green); }
+
+  /* ===== EMPTY STATE ===== */
+  .empty-state {
+    padding: 40px;
+    text-align: center;
+    color: #8aaad0;
+    font-family: 'DotGothic16', monospace;
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+
+  /* Blink animation */
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .blink { animation: blink 1s infinite; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--blue-panel); }
+  ::-webkit-scrollbar-thumb { background: #3a70d0; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #6ab0ff; }
+
+  /* Glowing separator */
+  .glow-line {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #3a70d0, transparent);
+    margin: 20px 0;
+  }
+
+  /* Day of week selector */
+  .dow-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+
+  .dow-btn {
+    background: #001a6a;
+    border: 1px solid #3a70d0;
+    color: #aaccff;
+    padding: 6px 4px;
+    font-family: 'DotGothic16', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+    border-radius: 2px;
+  }
+
+  .dow-btn.selected {
+    background: var(--blue-mid);
+    border-color: #6ab0ff;
+    color: var(--white);
+  }
+
+  /* Progress bar */
+  .progress-bar {
+    height: 3px;
+    background: #3a70d0;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: #6ab0ff;
+    border-radius: 2px;
+    transition: width 0.5s;
+  }
+
+  .progress-fill.green { background: var(--green); }
+  .progress-fill.orange { background: var(--orange); }
+
+  /* Archive status overrides — all white */
+  .archive-status .status-cancelled,
+  .archive-status .status-delay,
+  .archive-status .status-delay .delay-mins,
+  .archive-status .status-ok,
+  .archive-status .status-running {
+    color: #ffffff !important;
+    text-shadow: none !important;
+  }
+
+  /* ===== PÜNKTLICHKEIT PAGE ===== */
+  .punk-page {
+    min-height: calc(100vh - 140px);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .punk-bg {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    transition: opacity 0.5s;
+  }
+
+  .punk-bg-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to bottom,
+      rgba(10,20,60,0.55) 0%,
+      rgba(5,10,40,0.45) 60%,
+      rgba(0,5,30,0.65) 100%
+    );
+  }
+
+  .punk-content {
+    position: relative;
+    z-index: 2;
+    padding: 40px 32px 32px;
+  }
+
+  .punk-headline {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: clamp(22px, 4vw, 40px);
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1.15;
+    margin-bottom: 32px;
+    max-width: 640px;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+  }
+
+  .punk-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 3px;
+  }
+
+  .punk-card {
+    position: relative;
+    overflow: hidden;
+    padding: 28px 20px 20px;
+    min-height: 160px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+
+  .punk-card-bg {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+  }
+
+  .punk-card-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,10,50,0.52);
+    transition: background 0.2s;
+  }
+
+  .punk-card:hover .punk-card-overlay {
+    background: rgba(0,10,50,0.38);
+  }
+
+  .punk-card-content {
+    position: relative;
+    z-index: 2;
+  }
+
+  .punk-pct {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 36px;
+    font-weight: 300;
+    color: #ffffff;
+    line-height: 1;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    margin-bottom: 6px;
+  }
+
+  .punk-type-label {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+  }
+
+  .punk-type-sub {
+    font-family: 'DotGothic16', monospace;
+    font-size: 10px;
+    color: rgba(255,255,255,0.75);
+    margin-top: 3px;
+    letter-spacing: 1px;
+  }
+
+  .punk-bar {
+    height: 3px;
+    background: rgba(255,255,255,0.25);
+    border-radius: 2px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+
+  .punk-bar-fill {
+    height: 100%;
+    background: #ffffff;
+    border-radius: 2px;
+    transition: width 1s ease;
+  }
+
+  .punk-no-data {
+    font-family: 'DotGothic16', monospace;
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    margin-top: 4px;
+  }
+
+  /* bg upload button in settings */
+  .bg-upload-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .btn-upload {
+    background: rgba(106,176,255,0.1);
+    border: 1px solid #6ab0ff;
+    color: #6ab0ff;
+    padding: 8px 16px;
+    font-family: 'DotGothic16', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.15s;
+  }
+
+  .btn-upload:hover { background: rgba(106,176,255,0.2); color: white; }
+
+  .bg-preview {
+    width: 60px;
+    height: 36px;
+    object-fit: cover;
+    border: 1px solid #3a70d0;
+    border-radius: 2px;
+    display: none;
+  }
+
+  .btn-clear-bg {
+    background: transparent;
+    border: 1px solid var(--red);
+    color: var(--red);
+    padding: 8px 12px;
+    font-family: 'DotGothic16', monospace;
+    font-size: 10px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.15s;
+    display: none;
+  }
+
+  .btn-clear-bg:hover { background: rgba(255,68,68,0.15); }
+
+  select option { background: #002080; color: white; }
+
+  /* Toggle switch */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .toggle-row input[type=checkbox] { display: none; }
+
+  .toggle-track {
+    width: 36px;
+    height: 20px;
+    background: #001a6a;
+    border: 1px solid #3a70d0;
+    border-radius: 10px;
+    position: relative;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+
+  .toggle-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 12px;
+    height: 12px;
+    background: #6ab0ff;
+    border-radius: 50%;
+    transition: left 0.2s;
+  }
+
+  .toggle-row input:checked + .toggle-track {
+    background: #0050cc;
+    border-color: #6ab0ff;
+  }
+
+  .toggle-row input:checked + .toggle-track .toggle-thumb {
+    left: 19px;
+    background: #ffffff;
+  }
+
+  .toggle-label {
+    font-family: 'DotGothic16', monospace;
+    font-size: 12px;
+    color: var(--white);
+  }
+
+
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <span class="tai-vertical">たい</span>
+    <div class="header-logo">TAI<span>BAHN</span></div>
+  </div>
+  <div class="header-clock">
+    <div class="analog-clock" id="analogClock">
+      <div class="hand hand-hour"   id="handHour"></div>
+      <div class="hand hand-minute" id="handMinute"></div>
+      <div class="hand hand-second" id="handSecond"></div>
+    </div>
+    <span id="clock">--:--:--</span>
+  </div>
+  <div class="header-date" id="dateDisplay">---</div>
+</div>
+
+<div class="nav-container">
+  <div class="knob-wrapper">
+    <div class="knob" id="knobEl" title="Seitenwahlschalter"></div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="switchPage('abfahrt', 0)">Abfahrt</button>
+      <button class="nav-tab" onclick="switchPage('leistung', 1)">Leistung</button>
+      <button class="nav-tab" onclick="switchPage('punk', 2)">Pünktlichkeit</button>
+      <button class="nav-tab" onclick="switchPage('einstellung', 3)">Einstellung</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ABFAHRT PAGE ===== -->
+<div class="main">
+<div class="page active" id="page-abfahrt">
+  <div style="margin-top:20px">
+    <div class="panel-header">
+      <span class="panel-title">Abfahrt</span>
+      <span class="panel-subtitle">Heutige Züge</span>
+    </div>
+    <div class="board">
+      <div class="board-cols">
+        <span class="board-col-label">Zeit</span>
+        <span class="board-col-label">Zug</span>
+        <span class="board-col-label">Ziel</span>
+        <span class="board-col-label">Ankunft</span>
+        <span class="board-col-label" style="text-align:right">Status</span>
+        <span class="board-col-label" style="text-align:center">Gleis</span>
+      </div>
+      <div id="abfahrt-featured"></div>
+      <div class="folge-header">Folgezüge:</div>
+      <div id="abfahrt-folge"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== LEISTUNG PAGE ===== -->
+<div class="page" id="page-leistung">
+  <div style="margin-top:20px">
+    <div class="panel-header">
+      <span class="panel-title">Leistungsübersicht</span>
+      <span class="panel-subtitle">Pünktlichkeit · Verspätung · Ausfälle</span>
+    </div>
+    <div class="board" style="padding:20px;margin-bottom:20px">
+      <div class="stats-grid" id="stats-summary"></div>
+    </div>
+
+    <div class="panel-header">
+      <span class="panel-title">Fahrtenarchiv</span>
+      <span class="panel-subtitle">Alle Fahrten</span>
+    </div>
+    <div class="board">
+      <div class="stats-board-cols">
+        <span class="board-col-label">Datum</span>
+        <span class="board-col-label">Zug</span>
+        <span class="board-col-label">Ziel</span>
+        <span class="board-col-label" style="text-align:center">Gl.</span>
+        <span class="board-col-label" style="text-align:right">Plan</span>
+        <span class="board-col-label" style="text-align:right">Tatsächlich</span>
+        <span class="board-col-label" style="text-align:right">Dauer</span>
+        <span class="board-col-label" style="text-align:right">Status</span>
+      </div>
+      <div id="leistung-rows"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PÜNKTLICHKEIT PAGE ===== -->
+<div class="page" id="page-punk">
+  <div class="punk-page">
+    <div class="punk-bg" id="punk-bg"></div>
+    <div class="punk-bg-overlay"></div>
+    <div class="punk-content">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:28px">
+        <div class="punk-headline" id="punk-headline">Pünktlichkeitswerte<br>TAIBAHN</div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+          <label class="btn-upload" style="cursor:pointer">
+            📷 Hintergrundbild
+            <input type="file" accept="image/*" id="bg-file-input" style="display:none" onchange="handleBgUpload(this)">
+          </label>
+          <button class="btn-clear-bg" id="btn-clear-bg" onclick="clearBg()">✕ Entfernen</button>
+          <img id="bg-preview" class="bg-preview">
+        </div>
+      </div>
+      <div class="punk-grid" id="punk-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== EINSTELLUNG PAGE ===== -->
+<div class="page" id="page-einstellung">
+  <div style="margin-top:20px">
+    <div class="settings-grid">
+      <!-- Add train form -->
+      <div>
+        <div class="settings-panel">
+          <div class="settings-panel-header">Neue Fahrt anlegen</div>
+          <div class="settings-form">
+
+            <div class="form-row-inline">
+              <div class="form-row">
+                <label class="form-label">Zugtyp</label>
+                <select class="form-select" id="f-type">
+                  <option value="ICE">ICE — Intensiv Kognitiv Express</option>
+                  <option value="IC">IC — Intensiv Kognitiv</option>
+                  <option value="RE">RE — Relax Express</option>
+                  <option value="RB" selected>RB — Relax Bahn</option>
+                  <option value="U">U — Unbekannte Bahn</option>
+                  <option value="FLX">FLX — Gesundheitsbahn</option>
+                </select>
+              </div>
+              <div class="form-row">
+                <label class="form-label">Zugnummer</label>
+                <input class="form-input" id="f-num" type="text" placeholder="z.B. 151" maxlength="6">
+                <span class="form-error" id="f-num-error"></span>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <label class="form-label">Zielname (Aufgabe)</label>
+              <input class="form-input" id="f-ziel" type="text" placeholder="z.B. Japanisch Lektion 12">
+            </div>
+
+            <div class="form-row">
+              <label class="form-label">Via (Zwischenschritte, optional)</label>
+              <input class="form-input" id="f-via" type="text" placeholder="z.B. Vokabeln → Grammatik">
+            </div>
+
+            <div class="form-row">
+              <label class="form-label">Wochentag (nächster Termin)</label>
+              <div class="dow-grid" id="dow-selector">
+                <button class="dow-btn" data-d="1">Mo</button>
+                <button class="dow-btn" data-d="2">Di</button>
+                <button class="dow-btn" data-d="3">Mi</button>
+                <button class="dow-btn" data-d="4">Do</button>
+                <button class="dow-btn" data-d="5">Fr</button>
+                <button class="dow-btn" data-d="6">Sa</button>
+                <button class="dow-btn" data-d="0">So</button>
+              </div>
+            </div>
+
+            <div class="form-row-inline">
+              <div class="form-row">
+                <label class="form-label">Geplante Abfahrt</label>
+                <input class="form-input" id="f-abfahrt" type="tel" placeholder="0900" maxlength="4">
+              </div>
+              <div class="form-row">
+                <label class="form-label">Geplante Dauer (min)</label>
+                <input class="form-input" id="f-dauer" type="number" placeholder="60" min="5" max="480">
+              </div>
+            </div>
+
+            <button class="btn-submit" onclick="addTrain()">Zug einplanen ＋</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Train list -->
+      <div>
+        <div class="settings-panel">
+          <div class="settings-panel-header">Fahrplan — Alle Züge</div>
+          <div id="stab-content-all" class="train-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div><!-- end .main -->
+
+<!-- ===== ACTION MODAL ===== -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">Zuginformation</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-info" id="modal-info"></div>
+      <div class="modal-actions" id="modal-actions"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit run times modal -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="edit-modal-title">Zeiten bearbeiten</span>
+      <button class="modal-close" onclick="closeEditModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-info" id="edit-modal-info"></div>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-top:12px">
+        <div class="form-row">
+          <label class="form-label">Abfahrt (actualStart)</label>
+          <input class="form-input" type="tel" id="edit-start" placeholder="0900" maxlength="4">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Ankunft (actualEnd)</label>
+          <input class="form-input" type="tel" id="edit-end" placeholder="1030" maxlength="4">
+        </div>
+      </div>
+      <div class="modal-actions" style="margin-top:16px">
+        <button class="btn-modal green" onclick="saveEditRun()">✓ Speichern</button>
+        <button class="btn-modal" onclick="closeEditModal()">Abbrechen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+const DAYS_DE = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+const DAYS_FULL = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+
+// Validation: type → max number digits
+const TYPE_NUM_RULES = {
+  ICE: { min: 1, max: 999 },
+  IC:  { min: 1, max: 9999 },
+  RE:  { min: 1, max: 99999 },
+  RB:  { min: 1, max: 99999 },
+  S:   { min: 1, max: 99 },
+  U:   { min: 1, max: 30 },
+  FLX: { min: 1, max: 999 },
+};
+
+let trains = JSON.parse(localStorage.getItem('taibahn_trains') || '[]');
+let runs   = JSON.parse(localStorage.getItem('taibahn_runs')   || '[]');
+// runs: { id, trainId, date(YYYY-MM-DD), plannedStart, plannedEnd, actualStart, actualEnd, status(pending/running/done/cancelled), delayMins }
+
+let selectedDow = null;
+let currentModal = null;
+
+function save() {
+  localStorage.setItem('taibahn_trains', JSON.stringify(trains));
+  localStorage.setItem('taibahn_runs',   JSON.stringify(runs));
+}
+
+// ============================================================
+// CLOCK
+// ============================================================
+function updateClock() {
+  const now = new Date();
+  const t = now.toTimeString().slice(0,8);
+  document.getElementById('clock').textContent = t;
+  document.getElementById('dateDisplay').textContent =
+    `${DAYS_FULL[now.getDay()]}, ${now.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}`;
+
+  // Analog clock hands
+  const s = now.getSeconds();
+  const m = now.getMinutes() + s / 60;
+  const h = (now.getHours() % 12) + m / 60;
+  document.getElementById('handSecond').style.transform = `rotate(${s * 6}deg)`;
+  document.getElementById('handMinute').style.transform = `rotate(${m * 6}deg)`;
+  document.getElementById('handHour').style.transform   = `rotate(${h * 30}deg)`;
+
+  checkDelays();
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ============================================================
+// NAVIGATION / KNOB
+// ============================================================
+let currentPageIdx = 0;
+const pages = ['abfahrt','leistung','punk','einstellung'];
+const knob = document.getElementById('knobEl');
+
+function switchPage(name, idx) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  document.querySelectorAll('.nav-tab')[idx].classList.add('active');
+  currentPageIdx = idx;
+  // Rotate knob
+  knob.style.transform = `rotate(${idx * 120}deg)`;
+  renderAll();
+}
+
+knob.addEventListener('click', () => {
+  const next = (currentPageIdx + 1) % pages.length;
+  switchPage(pages[next], next);
+});
+
+// ============================================================
+// DOW SELECTOR
+// ============================================================
+document.querySelectorAll('.dow-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.dow-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    selectedDow = parseInt(btn.dataset.d);
+  });
+});
+
+// ============================================================
+// VALIDATION
+// ============================================================
+function validateNum(type, num) {
+  const n = parseInt(num);
+  if (isNaN(n) || num.trim() === '') return 'Bitte eine Zahl eingeben';
+  const rule = TYPE_NUM_RULES[type];
+  if (!rule) return null;
+  if (n < rule.min || n > rule.max) return `${type}: Nummer muss ${rule.min}–${rule.max} sein`;
+  return null;
+}
+
+document.getElementById('f-num').addEventListener('input', function() {
+  const type = document.getElementById('f-type').value;
+  const errEl = document.getElementById('f-num-error');
+  const rangeErr = validateNum(type, this.value);
+  if (rangeErr) {
+    this.classList.add('invalid'); this.classList.remove('valid');
+    errEl.textContent = rangeErr; return;
+  }
+
+  this.classList.remove('invalid'); this.classList.add('valid');
+  errEl.textContent = '';
+});
+
+// Also re-check when type changes
+document.getElementById('f-type').addEventListener('change', function() {
+  document.getElementById('f-num').dispatchEvent(new Event('input'));
+});
+
+// ============================================================
+// ADD TRAIN
+// ============================================================
+function addTrain(prefill) {
+  const type    = document.getElementById('f-type').value;
+  const num     = document.getElementById('f-num').value.trim();
+  const ziel    = document.getElementById('f-ziel').value.trim();
+  const via     = document.getElementById('f-via').value.trim();
+  const abfahrt = numToTime(document.getElementById('f-abfahrt').value);
+  const dauer   = parseInt(document.getElementById('f-dauer').value) || 60;
+
+  if (!num) { toast('Zugnummer fehlt', 'error'); return; }
+  const numErr = validateNum(type, num);
+  if (numErr) { toast(numErr, 'error'); return; }
+  if (!ziel) { toast('Zielname fehlt', 'error'); return; }
+  if (selectedDow === null) { toast('Wochentag (Gleis) wählen', 'error'); return; }
+  if (!abfahrt) { toast('Abfahrtszeit ungültig (z.B. 0900)', 'error'); return; }
+
+  const id = Date.now().toString();
+  const zugId = `${type} ${num}`;
+
+  // Compute concrete date: next occurrence of selectedDow (including today)
+  const today = new Date();
+  const todayDow = today.getDay();
+  let daysAhead = (selectedDow - todayDow + 7) % 7; // 0 = today
+  const targetDate = new Date(today);
+  targetDate.setDate(today.getDate() + daysAhead);
+  const dateStr = targetDate.toISOString().slice(0,10);
+
+  trains.push({ id, zugId, type, num, ziel, via, dow: selectedDow, date: dateStr, abfahrt, dauer });
+  save();
+
+  // Auto-generate today's run if date is today
+  if (daysAhead === 0) {
+    createTodayRun({ id, zugId, type, num, ziel, via, dow: selectedDow, date: dateStr, abfahrt, dauer });
+  }
+
+  toast(`${zugId} → ${ziel} eingetragen`, 'success');
+  renderAll();
+  resetForm();
+}
+
+function resetForm() {
+  ['f-num','f-ziel','f-via','f-abfahrt'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-dauer').value = '';
+  document.querySelectorAll('.dow-btn').forEach(b => b.classList.remove('selected'));
+  selectedDow = null;
+  document.getElementById('f-num').className = 'form-input';
+}
+
+function createTodayRun(train) {
+  const today = new Date().toISOString().slice(0,10);
+  if (runs.find(r => r.trainId === train.id && r.date === today)) return;
+  const [hh, mm] = train.abfahrt.split(':').map(Number);
+  const planned = new Date(); planned.setHours(hh, mm, 0, 0);
+  const end = new Date(planned.getTime() + train.dauer * 60000);
+  runs.push({
+    id: Date.now().toString() + Math.random(),
+    trainId: train.id,
+    date: today,
+    plannedStart: train.abfahrt,
+    plannedEnd: `${String(end.getHours()).padStart(2,'0')}:${String(end.getMinutes()).padStart(2,'0')}`,
+    actualStart: null,
+    actualEnd: null,
+    status: 'pending',
+    delayMins: 0
+  });
+  save();
+}
+
+// Auto-generate runs for today on load — including Regelzüge
+function generateTodayRuns() {
+  const today = new Date().toISOString().slice(0,10);
+  trains.filter(t => t.date === today).forEach(t => createTodayRun(t));
+}
+
+// ============================================================
+// CHECK DELAYS
+// ============================================================
+function checkDelays() {
+  const now = new Date();
+  const today = now.toISOString().slice(0,10);
+  let changed = false;
+
+  runs.forEach(run => {
+    if (run.date !== today || run.status !== 'pending') return;
+    const train = trains.find(t => t.id === run.trainId);
+    if (!train) return;
+    const [hh, mm] = run.plannedStart.split(':').map(Number);
+    const planned = new Date(); planned.setHours(hh, mm, 0, 0);
+    const diffMins = Math.floor((now - planned) / 60000);
+    if (diffMins > 0 && run.delayMins !== diffMins) {
+      run.delayMins = diffMins;
+      changed = true;
+    }
+  });
+
+  // Propagate delays from prereq chains
+  trains.forEach(train => {
+    if (!train.prereq) return;
+    const prereqTrain = trains.find(t => t.id === train.prereq);
+    if (!prereqTrain) return;
+    const today = new Date().toISOString().slice(0,10);
+    const prereqRun = runs.find(r => r.trainId === prereqTrain.id && r.date === today);
+    const thisRun   = runs.find(r => r.trainId === train.id && r.date === today);
+    if (!prereqRun || !thisRun) return;
+    if (prereqRun.status === 'pending' || prereqRun.status === 'running') {
+      // Prereq not done: delay this by prereq's delay
+      if (prereqRun.delayMins > 0) { thisRun.delayMins = Math.max(thisRun.delayMins, prereqRun.delayMins); changed = true; }
+    }
+  });
+
+  if (changed) { save(); renderAbfahrt(); renderLeistung(); }
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function renderAll() {
+  renderAbfahrt();
+  renderLeistung();
+  renderPunk();
+  renderEinstellung();
+}
+
+function typeBadge(type) {
+  return `<span class="zug-type type-${type}">${type}</span>`;
+}
+
+// Planned end time string given run + train
+function getPlannedEnd(run, train) {
+  const [h, m] = run.plannedStart.split(':').map(Number);
+  const endMin = h * 60 + m + train.dauer;
+  return `${String(Math.floor(endMin / 60) % 24).padStart(2,'0')}:${String(endMin % 60).padStart(2,'0')}`;
+}
+
+// Arrival delay in minutes based on actualEnd vs plannedEnd (positive = late)
+function arrivalDelayMins(run, train) {
+  if (!run.actualEnd) return null;
+  const plannedEnd = getPlannedEnd(run, train);
+  const [ph, pm] = plannedEnd.split(':').map(Number);
+  const [ah, am] = run.actualEnd.split(':').map(Number);
+  return (ah * 60 + am) - (ph * 60 + pm);
+}
+
+function statusHTML(run, forArchive) {
+  if (!run) return '';
+  const train = trains.find(t => t.id === run.trainId);
+  if (run.status === 'cancelled') return `<span class="status-cancelled">+++ Zug fällt aus +++</span>`;
+  if (run.status === 'done') {
+    const delay = train ? arrivalDelayMins(run, train) : null;
+    if (delay === null || delay <= 0) return forArchive ? `<span class="status-ok">✓ pünktlich</span>` : '';
+    return `<span class="status-delay"><span class="delay-mins">+${delay} Min.</span>verspätet</span>`;
+  }
+  if (run.status === 'running') return `<span class="status-running">bitte nicht einsteigen</span>`;
+  if (run.delayMins > 0) return `<span class="status-delay"><span class="delay-mins">ca. +${run.delayMins} Min.</span>Verspätung</span>`;
+  return '';
+}
+
+// ---- ABFAHRT ----
+function renderAbfahrt() {
+  const today = new Date().toISOString().slice(0,10);
+  const now = new Date();
+
+  const todayRuns = runs
+    .filter(r => r.date === today)
+    .map(r => ({ run: r, train: trains.find(t => t.id === r.trainId) }))
+    .filter(x => x.train)
+    .sort((a,b) => a.train.abfahrt.localeCompare(b.train.abfahrt));
+
+  const upcoming = todayRuns.filter(x => x.run.status !== 'cancelled' && x.run.status !== 'done');
+  const allFinished = todayRuns.length > 0 && upcoming.length === 0;
+
+  const featEl = document.getElementById('abfahrt-featured');
+  const folgeEl = document.getElementById('abfahrt-folge');
+
+  // No trains today → show all registered trains (read-only)
+  if (!todayRuns.length) {
+    const allTrains = [...trains].sort((a,b) => a.abfahrt.localeCompare(b.abfahrt));
+    if (!allTrains.length) {
+      featEl.innerHTML = `<div class="empty-state">Keine Züge geplant.<br>Züge unter <em>Einstellung</em> anlegen.</div>`;
+      folgeEl.innerHTML = '';
+      return;
+    }
+    const [first, ...rest] = allTrains;
+    featEl.innerHTML = buildTrainRow(first, true);
+    folgeEl.innerHTML = rest.length
+      ? rest.map(t => buildTrainRow(t, false)).join('')
+      : '';
+    return;
+  }
+
+  // All finished → show tomorrow's first train
+  if (allFinished) {
+    const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().slice(0,10);
+    const tomorrowTrains = trains
+      .filter(t => t.date === tomorrowStr)
+      .sort((a,b) => a.abfahrt.localeCompare(b.abfahrt));
+    const tomorrowHTML = tomorrowTrains.length > 0
+      ? buildTrainRow(tomorrowTrains[0], true, 'morgen')
+      : '';
+    featEl.innerHTML = `<div class="empty-state" style="padding:16px">Alle Züge heute abgeschlossen ✓</div>` + tomorrowHTML;
+    folgeEl.innerHTML = '';
+    return;
+  }
+
+  // Normal: featured = next upcoming, folge = rest
+  const featured = upcoming[0];
+  const folge    = upcoming.slice(1);
+  featEl.innerHTML = buildRow(featured.run, featured.train, true);
+  folgeEl.innerHTML = folge.length
+    ? folge.map(x => buildRow(x.run, x.train, false)).join('')
+    : `<div class="empty-state" style="padding:16px">Keine weiteren Folgezüge heute</div>`;
+}
+
+// Read-only train row (no run, no buttons) — for fallback/tomorrow display
+function buildTrainRow(train, isFeatured, badge) {
+  const gleisLabel = DAYS_DE[train.dow] || '?';
+  // Compute planned end from abfahrt + dauer
+  const [th, tm] = train.abfahrt.split(':').map(Number);
+  const endMin = th * 60 + tm + train.dauer;
+  const plannedEnd = `${String(Math.floor(endMin / 60) % 24).padStart(2,'0')}:${String(endMin % 60).padStart(2,'0')}`;
+  return `<div class="board-row ${isFeatured ? 'featured' : ''}" style="${badge ? 'opacity:0.65' : ''}">
+    <span class="zeit-cell"><span class="zeit">${train.abfahrt}</span></span>
+    <span class="zug-badge">${typeBadge(train.type)}<span class="zug-num">${train.num}</span></span>
+    <span class="via-ziel">
+      <div class="ziel-name">${train.ziel}</div>
+      ${train.via ? `<div class="via-text">${train.via}</div>` : ''}
+    </span>
+    <span class="zeit-cell"><span class="zeit" style="font-size:16px">${plannedEnd}</span></span>
+    <span class="status-cell" style="font-family:'DotGothic16',monospace;font-size:10px;color:#6ab0ff;letter-spacing:1px">${badge || ''}</span>
+    <span class="gleis-cell"><span class="gleis-label">Gleis</span><span class="gleis-num">${gleisLabel}</span></span>
+  </div>`;
+}
+
+function buildRow(run, train, isFeatured) {
+  const isCancelled = run.status === 'cancelled';
+  const delay = run.delayMins > 0 && (run.status === 'pending') ? run.delayMins : 0;
+
+  // Compute estimated actual start time (shown as small badge)
+  let estimatedBadge = '';
+  if (delay > 0) {
+    const [hh,mm] = train.abfahrt.split(':').map(Number);
+    const newMin = hh * 60 + mm + delay;
+    const estTime = `${String(Math.floor(newMin/60)%24).padStart(2,'0')}:${String(newMin%60).padStart(2,'0')}`;
+    estimatedBadge = `<span class="zeit-est">${estTime}</span>`;
+  }
+
+  // Compute planned arrival and estimated arrival
+  const plannedEnd = getPlannedEnd(run, train);
+  let arrivalBadge = '';
+  if (run.status === 'done' && run.actualEnd) {
+    // Show actual arrival if it differs from planned
+    const aDelay = arrivalDelayMins(run, train);
+    if (aDelay !== null && aDelay > 0) {
+      arrivalBadge = `<span class="zeit-est">${run.actualEnd}</span>`;
+    }
+  } else if (delay > 0) {
+    // Pending with departure delay → estimated arrival shifts by same delay
+    const [eh, em] = plannedEnd.split(':').map(Number);
+    const estEndMin = eh * 60 + em + delay;
+    const estEnd = `${String(Math.floor(estEndMin/60)%24).padStart(2,'0')}:${String(estEndMin%60).padStart(2,'0')}`;
+    arrivalBadge = `<span class="zeit-est">${estEnd}</span>`;
+  } else if (run.status === 'running' && run.actualStart) {
+    // Running: if started late, shift arrival by departure delay
+    const [ph, pm] = run.plannedStart.split(':').map(Number);
+    const [sh, sm] = run.actualStart.split(':').map(Number);
+    const startDelay = (sh*60+sm) - (ph*60+pm);
+    if (startDelay > 0) {
+      const [eh, em] = plannedEnd.split(':').map(Number);
+      const estEndMin = eh * 60 + em + startDelay;
+      const estEnd = `${String(Math.floor(estEndMin/60)%24).padStart(2,'0')}:${String(estEndMin%60).padStart(2,'0')}`;
+      arrivalBadge = `<span class="zeit-est">${estEnd}</span>`;
+    }
+  }
+
+  const ankunftClass = isCancelled ? 'zeit cancelled' : 'zeit';
+  const zeitClass = isCancelled ? 'zeit cancelled' : 'zeit';
+
+  const actionsHTML = run.status === 'pending' ? `
+    <button class="btn-action start" onclick="openModal('${run.id}')">▶ Abfahrt</button>
+    <button class="btn-action cancel" onclick="cancelRun('${run.id}')">✕ Ausfall</button>
+  ` : run.status === 'running' ? `
+    <button class="btn-action finish" onclick="finishRun('${run.id}')">■ Ankunft</button>
+  ` : '';
+
+  // Gleis: show day abbreviation + number (dow is 0=So,1=Mo,...6=Sa)
+  const gleisLabel = DAYS_DE[train.dow] || '?';
+
+  return `<div class="board-row ${isFeatured ? 'featured' : ''}">
+    <span class="zeit-cell">
+      <span class="${zeitClass}">${train.abfahrt}</span>
+      ${estimatedBadge}
+    </span>
+    <span class="zug-badge">${typeBadge(train.type)}<span class="zug-num">${train.num}</span></span>
+    <span class="via-ziel">
+      <div class="ziel-name">${train.ziel}</div>
+      ${train.via ? `<div class="via-text">${train.via}</div>` : ''}
+    </span>
+    <span class="zeit-cell">
+      <span class="${ankunftClass}" style="font-size:16px">${plannedEnd}</span>
+      ${arrivalBadge}
+    </span>
+    <span class="status-cell row-actions">${actionsHTML || statusHTML(run, false)}</span>
+    <span class="gleis-cell">
+      <span class="gleis-label">Gleis</span>
+      <span class="gleis-num">${gleisLabel}</span>
+    </span>
+  </div>`;
+}
+
+// ---- LEISTUNG ----
+const STATS_TYPES = ['ICE','IC','RE','RB','FLX']; // S and U excluded from delay statistics
+
+function isStatRun(r) {
+  const train = trains.find(t => t.id === r.trainId);
+  return train && STATS_TYPES.includes(train.type);
+}
+
+function renderLeistung() {
+  // Stats based on runs (Fahrten), not trains — S and U excluded
+  const statRuns = runs.filter(isStatRun);
+  const total = statRuns.length;
+  const done  = statRuns.filter(r => r.status === 'done').length;
+  const cancelled = statRuns.filter(r => r.status === 'cancelled').length;
+  const delayed = statRuns.filter(r => {
+    if (r.status !== 'done') return false;
+    const train = trains.find(t => t.id === r.trainId);
+    if (!train) return false;
+    const d = arrivalDelayMins(r, train);
+    return d !== null && d > 0;
+  }).length;
+  const punctual = done - delayed;
+  const pct = done > 0 ? Math.round((punctual / done) * 100) : 0;
+
+  const avgDelay = (() => {
+    const delayedRuns = statRuns.filter(r => {
+      if (r.status !== 'done') return false;
+      const train = trains.find(t => t.id === r.trainId);
+      if (!train) return false;
+      const d = arrivalDelayMins(r, train);
+      return d !== null && d > 0;
+    });
+    if (!delayedRuns.length) return 0;
+    const tot = delayedRuns.reduce((sum, r) => {
+      const train = trains.find(t => t.id === r.trainId);
+      return sum + arrivalDelayMins(r, train);
+    }, 0);
+    return Math.round(tot / delayedRuns.length);
+  })();
+
+  document.getElementById('stats-summary').innerHTML = `
+    <div class="stat-card green">
+      <div class="stat-label">Pünktlichkeitsrate</div>
+      <div class="stat-value green">${pct}%</div>
+      <div class="progress-bar"><div class="progress-fill green" style="width:${pct}%"></div></div>
+      <div class="stat-sub">${punctual} von ${done} pünktlich</div>
+    </div>
+    <div class="stat-card orange">
+      <div class="stat-label">Ø Verspätung</div>
+      <div class="stat-value orange">${avgDelay}'</div>
+      <div class="stat-sub">${delayed} verspätete Fahrten</div>
+    </div>
+    <div class="stat-card red">
+      <div class="stat-label">Ausfälle</div>
+      <div class="stat-value red">${cancelled}</div>
+      <div class="stat-sub">von ${total} geplanten Fahrten</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Fahrten gesamt</div>
+      <div class="stat-value">${total}</div>
+      <div class="stat-sub">${done} abgeschlossen · ICE IC RE RB FLX</div>
+    </div>
+  `;
+
+  // History rows
+  const sorted = [...runs].sort((a,b) => b.date.localeCompare(a.date) || (a.plannedStart||'').localeCompare(b.plannedStart||''));
+  const rowsEl = document.getElementById('leistung-rows');
+  if (!sorted.length) {
+    rowsEl.innerHTML = `<div class="empty-state">Noch keine Fahrten aufgezeichnet.</div>`;
+    return;
+  }
+  rowsEl.innerHTML = sorted.map(run => {
+    const train = trains.find(t => t.id === run.trainId);
+    if (!train) return '';
+    const d = new Date(run.date + 'T00:00:00');
+    const dd = String(d.getDate()).padStart(2,'0');
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const dateStr = `${DAYS_DE[d.getDay()]} ${dd}.${mm}`;
+
+    // Compute actual duration vs planned — badge style like Abfahrt delay
+    let durStr = '—';
+    if (run.actualStart && run.actualEnd) {
+      const [sh,sm] = run.actualStart.split(':').map(Number);
+      const [eh,em] = run.actualEnd.split(':').map(Number);
+      const actual = (eh*60+em) - (sh*60+sm);
+      if (actual > 0) {
+        if (actual === train.dauer) {
+          durStr = `${train.dauer} min`;
+        } else {
+          durStr = `${train.dauer} min<span class="zeit-est" style="font-size:10px;padding:1px 5px;margin-left:6px">${actual} min</span>`;
+        }
+      }
+    }
+
+    // Planned start → planned end
+    const plannedEnd = getPlannedEnd(run, train);
+
+    return `<div class="stats-board-row">
+      <span style="font-family:'DotGothic16',monospace;font-size:11px;color:#aaccff">${dateStr}</span>
+      <span class="zug-badge">${typeBadge(train.type)}<span class="zug-num">${train.num}</span></span>
+      <span style="font-size:13px;color:var(--white)">${train.ziel}</span>
+      <span style="text-align:center"><span class="gleis-num" style="font-size:16px">${DAYS_DE[train.dow] || '?'}</span></span>
+      <span style="text-align:right;font-family:'DotGothic16',monospace;font-size:12px;color:#ffffff;font-weight:700;line-height:1.7">${run.plannedStart}<br>${plannedEnd}</span>
+      <span style="text-align:right;font-family:'DotGothic16',monospace;font-size:12px;color:#ffffff;line-height:1.7">${run.actualStart || '—'}<br>${run.actualEnd || '—'}</span>
+      <span style="text-align:right;font-family:'DotGothic16',monospace;font-size:11px;color:#aaccff">${durStr}</span>
+      <span style="text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:8px" class="archive-status">
+        ${statusHTML(run, false)}
+        <button onclick="openEditModal('${run.id}')" style="background:none;border:1px solid #3a70d0;color:#6ab0ff;font-family:'DotGothic16',monospace;font-size:9px;padding:2px 6px;cursor:pointer;border-radius:2px;white-space:nowrap">✎ edit</button>
+      </span>
+    </div>`;
+  }).join('');
+}
+
+// ---- PÜNKTLICHKEIT ----
+const PUNK_TYPES = [
+  { type: 'ICE', label: 'ICE', sub: 'Intensiv Kognitiv Express', color: '#cc0000' },
+  { type: 'IC',  label: 'IC',  sub: 'Intensiv Kognitiv',         color: '#cc0000' },
+  { type: 'RE',  label: 'RE',  sub: 'Relax Express',             color: '#1a4a9a' },
+  { type: 'RB',  label: 'RB',  sub: 'Relax Bahn',               color: '#1a4a9a' },
+  { type: 'FLX', label: 'FLX', sub: 'Gesundheitsbahn',          color: '#1fa538' },
+  { type: 'U',   label: 'U',   sub: 'Unbekannte Bahn',          color: '#7a4fa0' },
+];
+
+function punk_getMonthBounds() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return {
+    startStr: start.toISOString().slice(0,10),
+    endStr:   end.toISOString().slice(0,10),
+    label:    start.toLocaleDateString('de-DE',{month:'long',year:'numeric'})
+  };
+}
+
+function punkStats(type, startStr, endStr) {
+  const typeRuns = runs.filter(r => {
+    const t = trains.find(x => x.id === r.trainId);
+    return t && t.type === type && r.status === 'done'
+      && r.date >= startStr && r.date <= endStr;
+  });
+  if (!typeRuns.length) return null;
+  const delayed = typeRuns.filter(r => {
+    const t = trains.find(x => x.id === r.trainId);
+    const d = arrivalDelayMins(r, t);
+    return d !== null && d > 0;
+  }).length;
+  const pct = Math.round(((typeRuns.length - delayed) / typeRuns.length) * 100);
+  return { pct, total: typeRuns.length, delayed };
+}
+
+function renderPunk() {
+  const grid = document.getElementById('punk-grid');
+  const { startStr, endStr, label } = punk_getMonthBounds();
+
+  document.getElementById('punk-headline').innerHTML =
+    `Pünktlichkeitswerte<br>${label}`;
+
+  grid.innerHTML = PUNK_TYPES.map(pt => {
+    const stats = punkStats(pt.type, startStr, endStr);
+    const pct = stats ? stats.pct : null;
+    const barW = pct !== null ? pct : 0;
+    return `<div class="punk-card">
+      <div class="punk-card-bg" style="background:${pt.color}20"></div>
+      <div class="punk-card-overlay" style="background:rgba(0,5,30,0.55)"></div>
+      <div class="punk-card-content">
+        <div class="punk-bar"><div class="punk-bar-fill" style="width:${barW}%"></div></div>
+        <div class="punk-pct">${pct !== null ? pct + ' %' : '—'}</div>
+        <div class="punk-type-label">${pt.label}</div>
+        <div class="punk-type-sub">${pt.sub}</div>
+        ${stats ? `<div class="punk-no-data">${stats.total - stats.delayed} / ${stats.total} Fahrten</div>` : `<div class="punk-no-data">Keine Daten</div>`}
+      </div>
+    </div>`;
+  }).join('');
+
+  applyBg();
+}
+
+function applyBg() {
+  const bg = localStorage.getItem('taibahn_bg');
+  const el = document.getElementById('punk-bg');
+  if (bg) {
+    el.style.backgroundImage = `url(${bg})`;
+    el.style.opacity = '1';
+  } else {
+    el.style.backgroundImage = 'none';
+    el.style.background = 'linear-gradient(135deg, #001040 0%, #002580 50%, #000820 100%)';
+  }
+}
+
+function handleBgUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      localStorage.setItem('taibahn_bg', e.target.result);
+    } catch {
+      toast('Bild zu groß für localStorage', 'error'); return;
+    }
+    const preview = document.getElementById('bg-preview');
+    const clearBtn = document.getElementById('btn-clear-bg');
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+    clearBtn.style.display = 'inline-block';
+    applyBg();
+    toast('Hintergrundbild gespeichert', 'success');
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearBg() {
+  localStorage.removeItem('taibahn_bg');
+  document.getElementById('bg-preview').style.display = 'none';
+  document.getElementById('btn-clear-bg').style.display = 'none';
+  document.getElementById('bg-file-input').value = '';
+  applyBg();
+  toast('Hintergrundbild entfernt', '');
+}
+
+function initBgPreview() {
+  const bg = localStorage.getItem('taibahn_bg');
+  if (bg) {
+    const preview = document.getElementById('bg-preview');
+    const clearBtn = document.getElementById('btn-clear-bg');
+    preview.src = bg;
+    preview.style.display = 'block';
+    clearBtn.style.display = 'inline-block';
+  }
+}
+
+// ---- EINSTELLUNG ----
+function renderEinstellung() {
+  const listEl = document.getElementById('stab-content-all');
+  if (!trains.length) {
+    listEl.innerHTML = `<div class="empty-state">Noch keine Züge angelegt.</div>`;
+  } else {
+    listEl.innerHTML = trains.map(t => {
+      return `<div class="train-item">
+        <div class="train-item-info">
+          ${typeBadge(t.type)}
+          <span class="zug-num" style="font-size:13px">${t.num}</span>
+          <span class="train-item-name">${t.ziel}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <span class="train-item-meta">${formatTrainDate(t)} ${t.abfahrt} · ${t.dauer}min</span>
+          <button class="btn-danger" onclick="confirmDeleteTrain('${t.id}')">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+
+// ============================================================
+// ACTIONS
+// ============================================================
+function cancelRun(runId) {
+  const run = runs.find(r => r.id === runId);
+  if (!run) return;
+  run.status = 'cancelled';
+  save();
+  toast('Zug fällt heute aus', 'error');
+  renderAbfahrt(); renderLeistung();
+}
+
+function openModal(runId) {
+  const run = runs.find(r => r.id === runId);
+  const train = run ? trains.find(t => t.id === run.trainId) : null;
+  if (!run || !train) return;
+  currentModal = runId;
+
+  document.getElementById('modal-title').textContent = `${train.zugId} → ${train.ziel}`;
+
+  const now = new Date();
+  const nowStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+  document.getElementById('modal-info').innerHTML = `
+    <div class="modal-field"><div class="modal-field-label">Zugtyp</div><div class="modal-field-value">${typeBadge(train.type)} ${train.zugId}</div></div>
+    <div class="modal-field"><div class="modal-field-label">Ziel</div><div class="modal-field-value">${train.ziel}</div></div>
+    <div class="modal-field"><div class="modal-field-label">Geplante Abfahrt</div><div class="modal-field-value">${run.plannedStart}</div></div>
+    <div class="modal-field"><div class="modal-field-label">Jetzt</div><div class="modal-field-value">${nowStr}</div></div>
+    <div class="modal-field"><div class="modal-field-label">Geplante Dauer</div><div class="modal-field-value">${train.dauer} min</div></div>
+    <div class="modal-field"><div class="modal-field-label">Status</div><div class="modal-field-value">${statusHTML(run)}</div></div>
+  `;
+
+  document.getElementById('modal-actions').innerHTML = `
+    <button class="btn-modal green" onclick="startRun('${runId}')">▶ Abfahrt jetzt (${nowStr})</button>
+    <button class="btn-modal red"   onclick="cancelRun('${runId}');closeModal()">✕ Zug fällt heute aus</button>
+  `;
+
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  currentModal = null;
+}
+
+function startRun(runId) {
+  const run = runs.find(r => r.id === runId);
+  const train = trains.find(t => t.id === run.trainId);
+  if (!run || !train) return;
+  const now = new Date();
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  const [ph, pm] = run.plannedStart.split(':').map(Number);
+  const plannedMins = ph * 60 + pm;
+
+  // Block early departure (DB rule)
+  if (nowMins < plannedMins) {
+    const waitMins = plannedMins - nowMins;
+    toast(`Zu früh — noch ${waitMins} Min. bis zur planmäßigen Abfahrt`, 'error');
+    return;
+  }
+
+  run.actualStart = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  run.status = 'running';
+  run.delayMins = Math.max(0, nowMins - plannedMins);
+  save();
+  closeModal();
+  toast(`${train.zugId} abgefahren`, 'success');
+  renderAbfahrt(); renderLeistung();
+}
+
+function finishRun(runId) {
+  const run = runs.find(r => r.id === runId);
+  const train = trains.find(t => t.id === run.trainId);
+  if (!run || !train) return;
+  const now = new Date();
+  run.actualEnd = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  run.status = 'done';
+  save();
+  toast(`${train.zugId} angekommen ✓`, 'success');
+  renderAbfahrt(); renderLeistung();
+}
+
+// ---- EDIT RUN TIMES ----
+let currentEditRunId = null;
+
+function openEditModal(runId) {
+  const run = runs.find(r => r.id === runId);
+  const train = run ? trains.find(t => t.id === run.trainId) : null;
+  if (!run || !train) return;
+  currentEditRunId = runId;
+
+  document.getElementById('edit-modal-title').textContent = `${train.zugId} → ${train.ziel}`;
+  document.getElementById('edit-modal-info').innerHTML = `
+    <div class="modal-field"><div class="modal-field-label">Datum</div><div class="modal-field-value">${run.date}</div></div>
+    <div class="modal-field"><div class="modal-field-label">Geplante Abfahrt</div><div class="modal-field-value">${run.plannedStart}</div></div>
+  `;
+  document.getElementById('edit-start').value = timeToNum(run.actualStart || run.plannedStart);
+  document.getElementById('edit-end').value   = run.actualEnd ? timeToNum(run.actualEnd) : '';
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').classList.remove('open');
+  currentEditRunId = null;
+}
+
+function saveEditRun() {
+  const run = runs.find(r => r.id === currentEditRunId);
+  if (!run) return;
+  const newStart = numToTime(document.getElementById('edit-start').value);
+  const newEnd   = numToTime(document.getElementById('edit-end').value);
+  if (!newStart) { toast('Abfahrtzeit ungültig (z.B. 0900)', 'error'); return; }
+
+  run.actualStart = newStart;
+  if (newEnd) {
+    run.actualEnd = newEnd;
+    run.status = 'done';
+    // Recompute departure delay
+    const [ph,pm] = run.plannedStart.split(':').map(Number);
+    const [sh,sm] = newStart.split(':').map(Number);
+    run.delayMins = Math.max(0, (sh*60+sm) - (ph*60+pm));
+  } else {
+    run.actualEnd = null;
+    run.status = 'running';
+  }
+  save();
+  closeEditModal();
+  toast('Zeiten aktualisiert', 'success');
+  renderAll();
+}
+
+function confirmDeleteTrain(trainId) {
+  const train = trains.find(t => t.id === trainId);
+  if (!train) return;
+  document.getElementById('modal-title').textContent = 'Zug löschen';
+  document.getElementById('modal-info').innerHTML = `
+    <div class="modal-field"><div class="modal-field-label">Zug</div><div class="modal-field-value">${typeBadge(train.type)} ${train.zugId}</div></div>
+    <div class="modal-field"><div class="modal-field-label">Ziel</div><div class="modal-field-value">${train.ziel}</div></div>
+    <div class="modal-field"><div class="modal-field-label">Fahrten</div><div class="modal-field-value">${runs.filter(r => r.trainId === trainId).length} Einträge werden mitgelöscht</div></div>
+    <div class="modal-field"><div class="modal-field-label">Warnung</div><div class="modal-field-value" style="color:var(--red)">Nicht rückgängig machbar</div></div>
+  `;
+  document.getElementById('modal-actions').innerHTML = `
+    <button class="btn-modal red" onclick="deleteTrain('${trainId}');closeModal()">✕ Endgültig löschen</button>
+    <button class="btn-modal blue" onclick="closeModal()">Abbrechen</button>
+  `;
+  document.getElementById('modal').classList.add('open');
+}
+
+function deleteTrain(trainId) {
+  const train = trains.find(t => t.id === trainId);
+  if (!train) return;
+  trains = trains.filter(t => t.id !== trainId);
+  runs   = runs.filter(r => r.trainId !== trainId);
+  save();
+  toast(`${train.zugId} entfernt`, '');
+  renderAll();
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+let toastTimer;
+function toast(msg, type='') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+// ============================================================
+// TIME HELPERS — number input ↔ HH:MM string
+// ============================================================
+// Format train.date as "Do 28.03" style, fallback to dow if no date
+function formatTrainDate(train) {
+  if (train.date) {
+    const d = new Date(train.date + 'T00:00:00');
+    const dd = String(d.getDate()).padStart(2,'0');
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    return `${DAYS_DE[d.getDay()]} ${dd}.${mm}`;
+  }
+  return DAYS_DE[train.dow] || '?';
+}
+
+// Convert 4-digit number (e.g. 900 or 1430) → "09:00" / "14:30"
+function numToTime(val) {
+  const n = parseInt(val);
+  if (isNaN(n) || n < 0) return null;
+  const h = Math.floor(n / 100);
+  const m = n % 100;
+  if (h > 23 || m > 59) return null;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+
+// Convert "HH:MM" → number for pre-filling inputs (e.g. "09:00" → 900)
+function timeToNum(str) {
+  if (!str || !/^\d{2}:\d{2}$/.test(str)) return '';
+  const [h, m] = str.split(':');
+  return parseInt(h) * 100 + parseInt(m);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+// Migrate S type trains to IC (S type removed)
+let migrated = false;
+trains.forEach(t => {
+  if (t.type === 'S') { t.type = 'IC'; t.zugId = 'IC ' + t.num; migrated = true; }
+});
+
+// Migrate trains without date: assign next occurrence of their dow from today
+trains.forEach(t => {
+  if (!t.date && t.dow !== undefined) {
+    const today = new Date();
+    const todayDow = today.getDay();
+    const daysAhead = (t.dow - todayDow + 7) % 7;
+    const target = new Date(today);
+    target.setDate(today.getDate() + daysAhead);
+    t.date = target.toISOString().slice(0,10);
+    migrated = true;
+  }
+});
+if (migrated) save();
+
+generateTodayRuns();
+renderAll();
+initBgPreview();
+</script>
+</body>
+</html>
