@@ -1695,40 +1695,48 @@ function generateTodayRuns() {
 // ============================================================
 // CHECK DELAYS
 // ============================================================
+// 替换原来的 checkDelays()
 function checkDelays() {
   const now = new Date();
-  const today = now.toISOString().slice(0,10);
+  const today = now.toISOString().slice(0, 10);
   let changed = false;
+  const nowMins = now.getHours() * 60 + now.getMinutes();
 
   runs.forEach(run => {
+    // ★ 关键：只处理 pending，其他状态一律不碰
     if (run.date !== today || run.status !== 'pending') return;
-    const train = trains.find(t => t.id === run.trainId);
-    if (!train) return;
+
     const [hh, mm] = run.plannedStart.split(':').map(Number);
-    const planned = new Date(); planned.setHours(hh, mm, 0, 0);
-    const diffMins = Math.floor((now - planned) / 60000);
-    if (diffMins > 0 && run.delayMins !== diffMins) {
+    const plannedMins = hh * 60 + mm;
+    const diffMins = Math.max(0, nowMins - plannedMins);
+
+    if (run.delayMins !== diffMins) {
       run.delayMins = diffMins;
       changed = true;
     }
   });
 
-  // Propagate delays from prereq chains
+  // prereq 传播同样只针对 pending
   trains.forEach(train => {
     if (!train.prereq) return;
     const prereqTrain = trains.find(t => t.id === train.prereq);
     if (!prereqTrain) return;
-    const today = new Date().toISOString().slice(0,10);
     const prereqRun = runs.find(r => r.trainId === prereqTrain.id && r.date === today);
-    const thisRun   = runs.find(r => r.trainId === train.id && r.date === today);
-    if (!prereqRun || !thisRun) return;
-    if (prereqRun.status === 'pending' || prereqRun.status === 'running') {
-      // Prereq not done: delay this by prereq's delay
-      if (prereqRun.delayMins > 0) { thisRun.delayMins = Math.max(thisRun.delayMins, prereqRun.delayMins); changed = true; }
+    const thisRun   = runs.find(r => r.trainId === train.id      && r.date === today);
+    if (!prereqRun || !thisRun || thisRun.status !== 'pending') return;
+    if ((prereqRun.status === 'pending' || prereqRun.status === 'running') && prereqRun.delayMins > 0) {
+      if (thisRun.delayMins !== prereqRun.delayMins) {
+        thisRun.delayMins = Math.max(thisRun.delayMins, prereqRun.delayMins);
+        changed = true;
+      }
     }
   });
 
-  if (changed) { save(); renderAbfahrt(); renderLeistung(); }
+  if (changed) {
+    save();
+    renderAbfahrt();
+    renderLeistung();
+  }
 }
 
 // ============================================================
@@ -2229,22 +2237,21 @@ function startRun(runId) {
   const run = runs.find(r => r.id === runId);
   const train = trains.find(t => t.id === run.trainId);
   if (!run || !train) return;
+
   const now = new Date();
   const nowMins = now.getHours() * 60 + now.getMinutes();
   const [ph, pm] = run.plannedStart.split(':').map(Number);
   const plannedMins = ph * 60 + pm;
 
-  // Block early departure (DB rule)
   if (nowMins < plannedMins) {
-    const waitMins = plannedMins - nowMins;
-    toast(`Zu früh — noch ${waitMins} Min. bis zur planmäßigen Abfahrt`, 'error');
+    toast(`Zu früh — noch ${plannedMins - nowMins} Min. bis zur planmäßigen Abfahrt`, 'error');
     return;
   }
 
   run.actualStart = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-  run.status = 'running';
+  run.status = 'running';          // ★ 先设状态
   run.delayMins = Math.max(0, nowMins - plannedMins);
-  save();
+  save();                          // ★ 立即持久化
   closeModal();
   toast(`${train.zugId} abgefahren`, 'success');
   renderAbfahrt(); renderLeistung();
@@ -2254,10 +2261,11 @@ function finishRun(runId) {
   const run = runs.find(r => r.id === runId);
   const train = trains.find(t => t.id === run.trainId);
   if (!run || !train) return;
+
   const now = new Date();
   run.actualEnd = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-  run.status = 'done';
-  save();
+  run.status = 'done';             // ★ 先设状态
+  save();                          // ★ 立即持久化
   toast(`${train.zugId} angekommen ✓`, 'success');
   renderAbfahrt(); renderLeistung();
 }
